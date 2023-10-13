@@ -19,28 +19,35 @@ public class FilterTaskAuth extends OncePerRequestFilter {
     private UserRepository userRepository;
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        var authorization = request.getHeader("Authorization");
-        byte[] authDecoded =  Base64.getDecoder().decode(authorization.substring("Basic".length()).trim());
-        String authString = new String(authDecoded);
 
-        String[] credentials = authString.split(":");
-        String userName = credentials[0];
-        String password = credentials[1];
+        var servletPath = request.getServletPath();
 
-        var user = this.userRepository.findByUserName(userName);
+        if(servletPath.equals("/task")) {
+            var authorization = request.getHeader("Authorization");
+            byte[] authDecoded =  Base64.getDecoder().decode(authorization.substring("Basic".length()).trim());
+            String authString = new String(authDecoded);
 
-        if(user == null) {
-            response.sendError(401, "Usuario sem autorização");
-        } else {
-          var passwordVerify =  BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
-            if(passwordVerify.verified) {
-                filterChain.doFilter(request,response);
+            String[] credentials = authString.split(":");
+            String userName = credentials[0];
+            String password = credentials[1];
 
-            } else {
+            var user = this.userRepository.findByUserName(userName);
+
+            if(user == null) {
                 response.sendError(401, "Usuario sem autorização");
-
+            } else {
+                var passwordVerify =  BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
+                if(passwordVerify.verified) {
+                    request.setAttribute("idUser", user.getId());
+                    filterChain.doFilter(request,response);
+                } else {
+                    response.sendError(401, "Usuario sem autorização");
+                }
             }
+
+
+        } else {
+            filterChain.doFilter(request,response);
         }
-        
     }
 }
